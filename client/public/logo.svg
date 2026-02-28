@@ -1,0 +1,9 @@
+<svg viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg">
+  <!-- Orange Figure -->
+  <circle cx="60" cy="50" r="20" fill="#f7931e" stroke="#fff" stroke-width="2"/>
+  <path d="M40,75 Q60,110 80,140 Q65,110 55,75 Z" fill="#f7931e" stroke="#fff" stroke-width="1"/>
+  
+  <!-- Green Figure -->
+  <circle cx="100" cy="35" r="22" fill="#39b54a" stroke="#fff" stroke-width="2"/>
+  <path d="M78,60 Q105,100 95,140 Q115,100 120,60 Z" fill="#39b54a" stroke="#fff" stroke-width="1"/>
+</svg>
