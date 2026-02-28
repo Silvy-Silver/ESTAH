@@ -1,5 +1,24 @@
-const puppeteer = require('puppeteer');
 const cache = require('../utils/cache');
+
+const getBrowser = async () => {
+    if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+        const puppeteer = require('puppeteer-core');
+        const chromium = require('@sparticuz/chromium');
+        return await puppeteer.launch({
+            args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
+            defaultViewport: chromium.defaultViewport,
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless,
+            ignoreHTTPSErrors: true,
+        });
+    } else {
+        const puppeteer = require('puppeteer');
+        return await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        });
+    }
+};
 
 const scrapeEventList = async () => {
     const cacheKey = "events_list";
@@ -9,10 +28,7 @@ const scrapeEventList = async () => {
         return cachedData;
     }
 
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    const browser = await getBrowser();
 
     try {
         const page = await browser.newPage();
@@ -86,18 +102,26 @@ const scrapeEventList = async () => {
         });
 
         // Enrich the base events with deep location/time scraped from their individual pages 
-        // to satisfy users needing explicit venues (like Gachibowli Stadium) not found on the card surface
-        const enrichedEvents = [];
-        for (const evt of events) {
-            try {
-                // We use the existing detail scraper! Wait max 10s per page
-                const detail = await module.exports.scrapeEventDetail(evt.slug);
-                evt.location = detail.location && detail.location.length > 3 ? detail.location : evt.location;
-                evt.time = detail.time && detail.time.length > 2 ? detail.time : evt.time;
-            } catch (err) {
-                console.error("Failed to enrich event: " + evt.slug, err);
+        // We skip this on Vercel or production to prevent the 10s Serverless Function timeout
+        let enrichedEvents = events;
+        if (!process.env.VERCEL && process.env.NODE_ENV !== 'production') {
+            enrichedEvents = [];
+            let count = 0;
+            for (const evt of events) {
+                if (count > 3) {
+                    enrichedEvents.push(evt);
+                    continue; // only enrich first 3 locally so it doesn't take forever
+                }
+                try {
+                    const detail = await module.exports.scrapeEventDetail(evt.slug);
+                    evt.location = detail.location && detail.location.length > 3 ? detail.location : evt.location;
+                    evt.time = detail.time && detail.time.length > 2 ? detail.time : evt.time;
+                } catch (err) {
+                    console.error("Failed to enrich event: " + evt.slug, err);
+                }
+                enrichedEvents.push(evt);
+                count++;
             }
-            enrichedEvents.push(evt);
         }
 
         // If scraping fails completely, return fallback data gracefully
@@ -145,10 +169,7 @@ const scrapeEventDetail = async (slug) => {
         return cachedData;
     }
 
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    const browser = await getBrowser();
 
     try {
         const page = await browser.newPage();
